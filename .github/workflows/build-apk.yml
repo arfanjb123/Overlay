@@ -21,17 +21,20 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install Android SDK & Gradle
+      - name: Install Android SDK & Gradle 8.7
         run: |
           set -e
           sudo mkdir -p "$ANDROID_HOME/cmdline-tools"
           curl -sSL -o /tmp/cmdtools.zip "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
           unzip -q /tmp/cmdtools.zip -d /tmp/cmdtools_extract
           sudo mv /tmp/cmdtools_extract/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
           yes | sudo "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses >/dev/null
           sudo "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-          sudo apt-get update -qq && sudo apt-get install -y -qq gradle
+
+          curl -sSL -o /tmp/gradle-8.7-bin.zip "https://services.gradle.org/distributions/gradle-8.7-bin.zip"
+          sudo unzip -q /tmp/gradle-8.7-bin.zip -d /opt
+          sudo ln -sf /opt/gradle-8.7/bin/gradle /usr/local/bin/gradle
+          gradle --version
 
       - name: Assemble debug APK
         run: gradle assembleDebug --no-daemon
