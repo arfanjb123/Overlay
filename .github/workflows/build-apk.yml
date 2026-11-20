@@ -11,6 +11,7 @@ jobs:
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
       ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+      DEBUG_KEYSTORE_PATH: /tmp/debug.keystore
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,6 +36,8 @@ jobs:
           sudo unzip -q /tmp/gradle-8.7-bin.zip -d /opt
           sudo ln -sf /opt/gradle-8.7/bin/gradle /usr/local/bin/gradle
           gradle --version
+
+          keytool -genkeypair -v -keystore "$DEBUG_KEYSTORE_PATH" -storepass android -keyalg RSA -keysize 2048 -validity 10000 -alias androiddebugkey -keypass android -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Assemble debug APK
         run: gradle assembleDebug --no-daemon
