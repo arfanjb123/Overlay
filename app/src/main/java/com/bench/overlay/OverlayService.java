@@ -35,10 +35,14 @@ public class OverlayService extends Service {
     private WindowManager wm;
     private WindowManager.LayoutParams params;
     private LinearLayout card;
+    private LinearLayout topBar;
+    private LinearLayout stealthBar;
     private LinearLayout bodyBox;
     private TextView dragTitle;
+    private Button btnSamaran, btnWipe, btnPanic, btnClose, btnBubble;
     private EditText qBox, notesBox;
     private TextView aiOut;
+    private boolean bubbleMode = false;
     private boolean disguised = false;
     private boolean secureFlag = true;
     private boolean focusable = true;
@@ -102,7 +106,7 @@ public class OverlayService extends Service {
         card.setBackgroundColor(Color.parseColor("#E611161D"));
         card.setPadding(20, 16, 20, 16);
 
-        LinearLayout topBar = new LinearLayout(this);
+        topBar = new LinearLayout(this);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
 
         dragTitle = new TextView(this);
@@ -112,18 +116,20 @@ public class OverlayService extends Service {
         dragTitle.setPadding(6, 8, 16, 8);
         topBar.addView(dragTitle);
 
-        Button btnSamaran = makeMiniBtn("Samaran", "#2D333B", v -> toggleSamaran());
-        Button btnWipe = makeMiniBtn("Wipe", "#491D22", v -> wipeAll());
-        Button btnPanic = makeMiniBtn("Panic", "#7A1C24", v -> panicHide());
-        Button btnClose = makeMiniBtn("X", "#333333", v -> stopSelf());
+        btnBubble = makeMiniBtn("Bub", "#264F78", v -> setBubbleMode(true));
+        btnSamaran = makeMiniBtn("Samaran", "#2D333B", v -> toggleSamaran());
+        btnWipe = makeMiniBtn("Wipe", "#491D22", v -> wipeAll());
+        btnPanic = makeMiniBtn("Panic", "#7A1C24", v -> panicHide());
+        btnClose = makeMiniBtn("X", "#333333", v -> stopSelf());
 
+        topBar.addView(btnBubble);
         topBar.addView(btnSamaran);
         topBar.addView(btnWipe);
         topBar.addView(btnPanic);
         topBar.addView(btnClose);
         card.addView(topBar);
 
-        LinearLayout stealthBar = new LinearLayout(this);
+        stealthBar = new LinearLayout(this);
         stealthBar.setOrientation(LinearLayout.HORIZONTAL);
         Button btnSec = makeMiniBtn("Anti-Cap: ON", "#1F4E2B", v -> {
             secureFlag = !secureFlag;
@@ -186,6 +192,56 @@ public class OverlayService extends Service {
         enableDrag(dragTitle);
     }
 
+    private void setBubbleMode(boolean enable) {
+        bubbleMode = enable;
+        if (bubbleMode) {
+            bodyBox.setVisibility(View.GONE);
+            stealthBar.setVisibility(View.GONE);
+            btnSamaran.setVisibility(View.GONE);
+            btnWipe.setVisibility(View.GONE);
+            btnPanic.setVisibility(View.GONE);
+            btnClose.setVisibility(View.GONE);
+            btnBubble.setVisibility(View.GONE);
+
+            dragTitle.setText("N");
+            dragTitle.setGravity(Gravity.CENTER);
+            dragTitle.setTextSize(16f);
+            dragTitle.setPadding(0, 0, 0, 0);
+
+            card.setGravity(Gravity.CENTER);
+            card.setPadding(8, 8, 8, 8);
+            card.setBackgroundColor(Color.parseColor("#6611161D"));
+            card.setAlpha(0.45f);
+
+            params.width = 128;
+            params.height = 128;
+            params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+            wm.updateViewLayout(card, params);
+        } else {
+            bodyBox.setVisibility(View.VISIBLE);
+            stealthBar.setVisibility(View.VISIBLE);
+            btnSamaran.setVisibility(View.VISIBLE);
+            btnWipe.setVisibility(View.VISIBLE);
+            btnPanic.setVisibility(View.VISIBLE);
+            btnClose.setVisibility(View.VISIBLE);
+            btnBubble.setVisibility(View.VISIBLE);
+
+            dragTitle.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            dragTitle.setTextSize(13f);
+            dragTitle.setPadding(6, 8, 16, 8);
+
+            card.setGravity(Gravity.NO_GRAVITY);
+            card.setPadding(20, 16, 20, 16);
+            card.setAlpha(1.0f);
+            applyCardTheme();
+
+            params.width = 820;
+            params.height = WindowManager.LayoutParams.WRAP_CONTENT;
+            updateWindowFlags();
+            wm.updateViewLayout(card, params);
+        }
+    }
+
     private Button makeMiniBtn(String label, String hexBg, View.OnClickListener listener) {
         Button b = new Button(this);
         b.setText(label);
@@ -207,6 +263,7 @@ public class OverlayService extends Service {
         handle.setOnTouchListener(new View.OnTouchListener() {
             int initX, initY;
             float touchX, touchY;
+            boolean moved;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -216,11 +273,22 @@ public class OverlayService extends Service {
                         initY = params.y;
                         touchX = event.getRawX();
                         touchY = event.getRawY();
+                        moved = false;
                         return true;
                     case MotionEvent.ACTION_MOVE:
-                        params.x = initX + (int) (event.getRawX() - touchX);
-                        params.y = initY + (int) (event.getRawY() - touchY);
+                        int dx = (int) (event.getRawX() - touchX);
+                        int dy = (int) (event.getRawY() - touchY);
+                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                            moved = true;
+                        }
+                        params.x = initX + dx;
+                        params.y = initY + dy;
                         wm.updateViewLayout(card, params);
+                        return true;
+                    case MotionEvent.ACTION_UP:
+                        if (!moved && bubbleMode) {
+                            setBubbleMode(false);
+                        }
                         return true;
                 }
                 return false;
@@ -249,8 +317,7 @@ public class OverlayService extends Service {
         }
     }
 
-    private void toggleSamaran() {
-        disguised = !disguised;
+    private void applyCardTheme() {
         if (disguised) {
             dragTitle.setText("Quick Memo");
             dragTitle.setTextColor(Color.DKGRAY);
@@ -266,6 +333,11 @@ public class OverlayService extends Service {
             notesBox.setTextColor(Color.LTGRAY);
             aiOut.setTextColor(Color.parseColor("#D0D7DE"));
         }
+    }
+
+    private void toggleSamaran() {
+        disguised = !disguised;
+        applyCardTheme();
     }
 
     private void panicHide() {
